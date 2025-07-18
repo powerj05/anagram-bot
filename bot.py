@@ -19,25 +19,26 @@ WEBHOOK_URL = os.environ.get("NGROK_URL")
 
 logging.info("Reading word list...")
 with open('words_alpha.txt') as file:
-    VALID_WORDS = file.read().splitlines()
+    VALID_WORDS = [line.strip().lower() for line in file]
 logging.info(f"Read {len(VALID_WORDS)} words.")
 
 def get_anagrams(letters: str):
     from itertools import permutations
     letters = letters.lower()
-    words = [word for word in VALID_WORDS if len(word) == len(letters)]
-    found = set()
+    length = len(letters)
+    valid_by_length = set(word for word in VALID_WORDS if len(word) == len(letters))
+    found = set(
+        ''.join(p) for p in permutations(letters,length)
+        if ''.join(p) in valid_by_length
+    )
     
-    for p in permutations(letters, len(letters)):
-        word = ''.join(p)
-        if word in words:
-            found.add(word)
     return sorted(found)
 
 async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
     results = []
-    if query and len(query) <= 10 and "." in query:
+    if query.endswith(".") and len(query) <= 10:
+        query = query[:-1]
         words = get_anagrams(query)
         for word in words:
             results.append(
@@ -50,7 +51,7 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.inline_query.answer(results[:50], cache_time=1)
 
 def handle_response(text: str) -> str:
-    return(f"Thanks. We received {text}.\nhrngh\nsoup")
+    return(f"Thanks. We received {text}.\nwoag. get_anagrams logic update??")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_type: str = update.message.chat.type
