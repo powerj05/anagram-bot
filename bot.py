@@ -25,18 +25,19 @@ logging.info(f"Read {len(VALID_WORDS)} words.")
 def get_anagrams(letters: str):
     from itertools import permutations
     letters = letters.lower()
+    words = [word for word in VALID_WORDS if len(word) == len(letters)]
     found = set()
-    for i in range(2, len(letters)+1):
-        for p in permutations(letters, i):
-            word = ''.join(p)
-            if word in VALID_WORDS:
-                found.add(word)
+    
+    for p in permutations(letters, len(letters)):
+        word = ''.join(p)
+        if word in words:
+            found.add(word)
     return sorted(found)
 
 async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
     results = []
-    if query and len(query) <= 10:
+    if query and len(query) <= 10 and "." in query:
         words = get_anagrams(query)
         for word in words:
             results.append(
