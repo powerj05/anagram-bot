@@ -1,8 +1,7 @@
 import os
 import logging
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-import json
+from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
+from telegram.ext import Application, InlineQueryHandler, ContextTypes, MessageHandler, filters
 import sys
 
 logging.basicConfig(
@@ -17,11 +16,36 @@ BOT_USERNAME = "@jpaddy2_bot"
 BOT_TOKEN = '7803980786:AAHxP7t-YQgIOl5aiHau3ICciy8De3ol6Kg'
 WEBHOOK_URL = os.environ.get("NGROK_URL")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logging.info(f"Received /start from user {update.effective_user.id}")
-    await update.message.reply_text("New bot!")
+logging.info("Reading word list...")
+with open('words_alpha.txt') as file:
+    VALID_WORDS = file.read().splitlines()
+logging.info(f"Read {len(VALID_WORDS)} words.")
 
-# hrngh. soup
+def get_anagrams(letters: str):
+    from itertools import permutations
+    letters = letters.lower()
+    found = set()
+    for i in range(2, len(letters)+1):
+        for p in permutations(letters, i):
+            word = ''.join(p)
+            if word in VALID_WORDS:
+                found.add(word)
+    return sorted(found)
+
+async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.inline_query.query.strip()
+    results = []
+    if query and len(query) <= 10:
+        words = get_anagrams(query)
+        for word in words:
+            results.append(
+                InlineQueryResultArticle(
+                    id=str(uuid.uuid4()),
+                    title=word,
+                    input_message_content=InputTextMessageContent(word),
+                )
+            )
+    await update.inline_query.answer(results[:50], cache_time=1)
 
 def handle_response(text: str) -> str:
     return(f"Thanks. We received {text}. Not up to much yet.")
@@ -47,8 +71,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     application = Application.builder().token(BOT_TOKEN).build()
 
-    application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(InlineQueryHandler(inline_query_handler))
 
     application.run_webhook(
         listen="0.0.0.0",
