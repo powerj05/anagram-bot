@@ -34,12 +34,30 @@ def get_anagrams(letters: str):
     
     return sorted(found)
 
+def get_cross(pattern: str):
+    valid_by_length = set(word for word in VALID_WORDS if len(word) == len(pattern))
+    pattern = pattern.lower().replace("?",".").replace("_",".")
+    import re
+    regex = re.compile(f"^{pattern}")
+    matches = [w for w in valid_by_length if regex.match(w)]
+    return matches
+
 async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
     results = []
     if query.endswith(".") and len(query) <= 10:
         query = query[:-1]
-        words = get_anagrams(query)
+
+        if(query.startswith("anagram ")):
+            words = get_anagrams(query[len: "anagram "])
+        elif(query.startswith("cross ")):
+            words = get_cross(query[len("cross ")])
+        else:
+            if("_" in query or "?" in query):
+                words = get_cross(query)
+            else:
+                words = get_anagrams(query)
+        
         for word in words:
             results.append(
                 InlineQueryResultArticle(
