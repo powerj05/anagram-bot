@@ -50,7 +50,7 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.inline_query.answer(results[:50], cache_time=1)
 
 def handle_response(text: str) -> str:
-    return(f"Thanks. We received {text}. Not up to much yet.")
+    return(f"Thanks. We received {text}.\nhrngh\nsoup")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_type: str = update.message.chat.type
