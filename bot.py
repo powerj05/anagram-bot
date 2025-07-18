@@ -3,6 +3,7 @@ import logging
 from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import Application, InlineQueryHandler, ContextTypes, MessageHandler, filters
 import sys
+import uuid
 
 logging.basicConfig(
     level=logging.INFO,
