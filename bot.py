@@ -21,7 +21,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info(f"Received /start from user {update.effective_user.id}")
     await update.message.reply_text("New bot!")
 
-
+# hrngh. soup
 
 def handle_response(text: str) -> str:
     return(f"Thanks. We received {text}. Not up to much yet.")
