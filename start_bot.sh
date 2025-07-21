@@ -25,4 +25,4 @@ echo "✅ ngrok URL: $NGROK_URL"
 
 # Start the bot
 export NGROK_URL
-python bot.py
+/home/johnp/telegram_bots/telegram_anagram_bot/venv/bin/python bot.py
