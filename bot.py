@@ -4,6 +4,7 @@ from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import Application, InlineQueryHandler, ContextTypes
 import sys
 import uuid
+from dotenv import load_dotenv
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,8 +14,10 @@ logging.basicConfig(
     ]
 )
 
-BOT_USERNAME = "@jpaddy2_bot"
-BOT_TOKEN = '7803980786:AAHxP7t-YQgIOl5aiHau3ICciy8De3ol6Kg'
+load_dotenv()
+
+BOT_USERNAME = os.environ.get("BOT_USERNAME")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 WEBHOOK_URL = os.environ.get("NGROK_URL")
 
 logging.info("Reading word list...")
