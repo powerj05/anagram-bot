@@ -5,6 +5,7 @@ from telegram.ext import Application, InlineQueryHandler, ContextTypes, CommandH
 import sys
 import uuid
 from dotenv import load_dotenv
+import requests
 
 logging.basicConfig(
     level=logging.INFO,
@@ -99,6 +100,25 @@ def get_wordle(pattern: str):
 
     return sorted(matches)
 
+def get_definition(word: str):
+    url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
+    try:
+        response = requests.get(url)
+        data = response.json()
+        if isinstance(data, list):
+            meanings = data[0]['meanings']
+            short_def = meanings[0]['definitions'][0]['definition']
+            full_def = ""
+            for m in meanings:
+                part_of_speech = m.get('partOfSpeech', '')
+                defs = [d['definition'] for d in m['definitions']]
+                full_def += f"({part_of_speech}) " + "; ".join(defs) + "\n"
+            return short_def, full_def.strip()
+        else:
+            return "No definition found.", "No definition found."
+    except Exception as e:
+        return "Error fetching definition.", str(e)
+
 async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
     logging.info(f"Received query {query}")
@@ -121,11 +141,13 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 words = get_anagrams(query)
         
         for word in words:
+            short_def, full_def = get_definition(word)
             results.append(
                 InlineQueryResultArticle(
                     id=str(uuid.uuid4()),
                     title=word,
-                    input_message_content=InputTextMessageContent(word),
+                    input_message_content=InputTextMessageContent(f"*{word}*\n{full_def}", parse_mode='Markdown'),
+                    description=short_def
                 )
             )
     await update.inline_query.answer(results[:50], cache_time=1)
