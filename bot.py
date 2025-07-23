@@ -49,7 +49,7 @@ def get_cross(pattern: str):
     import re
     regex = re.compile(f"^{pattern}")
     matches = [w for w in valid_by_length if regex.match(w)]
-    return matches
+    return sorted(matches)
 
 def get_wordle(pattern: str):
     parts = pattern.split()
