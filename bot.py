@@ -6,6 +6,9 @@ import sys
 import uuid
 from dotenv import load_dotenv
 import requests
+from nltk.corpus import wordnet as wn
+from nltk import download
+download("wordnet")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,6 +48,7 @@ def get_oneaway(word: str):
     return sorted(matches)
 
 def get_cross(pattern: str):
+    logging.info(f"Getting crossword matches for {pattern}")
     valid_by_length = set(w for w in VALID_WORDS if len(w) == len(pattern))
     pattern = pattern.lower().replace("?",".")
     import re
@@ -54,7 +58,7 @@ def get_cross(pattern: str):
 
 def get_wordle(pattern: str):
     parts = pattern.split()
-    green_part = None
+    green_part = "?????"
     black_letters = set()
     yellow_letters = {}
 
@@ -100,24 +104,50 @@ def get_wordle(pattern: str):
 
     return sorted(matches)
 
-def get_definition(word: str):
-    url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
-    try:
-        response = requests.get(url)
-        data = response.json()
-        if isinstance(data, list):
-            meanings = data[0]['meanings']
-            short_def = meanings[0]['definitions'][0]['definition']
-            full_def = ""
-            for m in meanings:
-                part_of_speech = m.get('partOfSpeech', '')
-                defs = [d['definition'] for d in m['definitions']]
-                full_def += f"({part_of_speech}) " + "; ".join(defs) + "\n"
-            return short_def, full_def.strip()
+def score_synset(synset):
+    score = 0
+
+    # Prefer common lexical categories
+    """preferred_lexnames = ['noun.person', 'noun.artifact', 'verb.communication']
+    if synset.lexname() in preferred_lexnames:
+        score += 2"""
+
+    # Reward short, simple definitions
+    if len(synset.definition().split()) < 12:
+        score += 1
+
+    # Prefer synsets with examples
+    if len(synset.examples()) > 0:
+        score += 1
+
+    # Prefer when the queried word is first lemma
+    if synset.lemmas()[0].name() == synset.name().split('.')[0]:
+        score += 1
+
+    return score
+
+def get_definitions(word, max_defs=3):
+    synsets = wn.synsets(word)
+    
+    if not synsets:
+        return "No definitions found","No definitions found"
+    
+    sorted_synsets = sorted(synsets, key=score_synset, reverse=True)
+
+    definitions = ""
+    short_def = sorted_synsets[0].definition()[:100]
+    for i, synset in enumerate(sorted_synsets[:max_defs]):
+        definition = synset.definition()
+        examples = synset.examples()
+        
+        if examples:
+            formatted = f"{i+1}. {definition}\n   _Example:_ {examples[0]}\n\n"
         else:
-            return "No definition found.", "No definition found."
-    except Exception as e:
-        return "Error fetching definition.", str(e)
+            formatted = f"{i+1}. {definition}\n\n"
+        
+        definitions += formatted
+    
+    return short_def,definitions
 
 async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
@@ -140,17 +170,27 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             else:
                 words = get_anagrams(query)
         
-        for word in words:
-            short_def, full_def = get_definition(word)
+        for word in words[:25]:
+            short_def,definitions = get_definitions(word)
             results.append(
                 InlineQueryResultArticle(
                     id=str(uuid.uuid4()),
                     title=word,
-                    input_message_content=InputTextMessageContent(f"*{word}*\n{full_def}", parse_mode='Markdown'),
+                    input_message_content=InputTextMessageContent(f"*{word}*\n{definitions}", parse_mode='Markdown'),
                     description=short_def
                 )
             )
-    await update.inline_query.answer(results[:50], cache_time=1)
+        
+        if len(words) > 25:
+            results.append(
+                InlineQueryResultArticle(
+                    id=str(uuid.uuid4()),
+                    title = f"{len(words)-25} more results match your query ({len(words)} in total)",
+                    description = "Try refining your query.",
+                    input_message_content = InputTextMessageContent(f"{len(words)} results found matching query {query}")
+                )
+            )
+    await update.inline_query.answer(results, cache_time=1)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = ("How to use this bot:\n\n"
