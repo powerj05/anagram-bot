@@ -6,9 +6,8 @@ import sys
 import uuid
 from dotenv import load_dotenv
 import requests
-from nltk.corpus import wordnet as wn
-from nltk import download
-download("wordnet")
+import asyncio
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,6 +21,7 @@ load_dotenv()
 BOT_USERNAME = os.environ.get("BOT_USERNAME")
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 WEBHOOK_URL = os.environ.get("NGROK_URL")
+MAX_RESULTS = 50
 
 logging.info("Reading word list...")
 with open('words_alpha.txt') as file:
@@ -104,50 +104,25 @@ def get_wordle(pattern: str):
 
     return sorted(matches)
 
-def score_synset(synset):
-    score = 0
+"""async def get_definitions(word, max_defs=3):
+    logging.info(f"Fetching definitions for {word}")
+    url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
+    try:
+        r = requests.get(url)
+        if r.status_code != 200:
+            return [f"No definitions found (bad response {r.status_code})"]
 
-    # Prefer common lexical categories
-    """preferred_lexnames = ['noun.person', 'noun.artifact', 'verb.communication']
-    if synset.lexname() in preferred_lexnames:
-        score += 2"""
-
-    # Reward short, simple definitions
-    if len(synset.definition().split()) < 12:
-        score += 1
-
-    # Prefer synsets with examples
-    if len(synset.examples()) > 0:
-        score += 1
-
-    # Prefer when the queried word is first lemma
-    if synset.lemmas()[0].name() == synset.name().split('.')[0]:
-        score += 1
-
-    return score
-
-def get_definitions(word, max_defs=3):
-    synsets = wn.synsets(word)
-    
-    if not synsets:
-        return "No definitions found","No definitions found"
-    
-    sorted_synsets = sorted(synsets, key=score_synset, reverse=True)
-
-    definitions = ""
-    short_def = sorted_synsets[0].definition()[:100]
-    for i, synset in enumerate(sorted_synsets[:max_defs]):
-        definition = synset.definition()
-        examples = synset.examples()
-        
-        if examples:
-            formatted = f"{i+1}. {definition}\n   _Example:_ {examples[0]}\n\n"
-        else:
-            formatted = f"{i+1}. {definition}\n\n"
-        
-        definitions += formatted
-    
-    return short_def,definitions
+        data = r.json()
+        results = []
+        for meaning in data[0]["meanings"]:
+            for defn in meaning["definitions"]:
+                line = defn["definition"]
+                if "example" in defn:
+                    line += f"\n   _Example:_ {defn['example']}"
+                results.append(line)
+        return results[:max_defs]
+    except Exception:
+        return ["No definitions found (unknown exception)"]"""
 
 async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
@@ -170,24 +145,20 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             else:
                 words = get_anagrams(query)
         
-        for word in words[:25]:
-            short_def,definitions = get_definitions(word)
+        """tasks=[]
+        async with asyncio.TaskGroup() as tg:
+            for word in words[:MAX_RESULTS]:
+                task = tg.create_task(get_definitions(word))
+                tasks.append(task)
+        definitions = [task.result() for task in tasks]"""
+
+        for i in range(MAX_RESULTS):
+            word = words[i]
             results.append(
                 InlineQueryResultArticle(
                     id=str(uuid.uuid4()),
                     title=word,
-                    input_message_content=InputTextMessageContent(f"*{word}*\n{definitions}", parse_mode='Markdown'),
-                    description=short_def
-                )
-            )
-        
-        if len(words) > 25:
-            results.append(
-                InlineQueryResultArticle(
-                    id=str(uuid.uuid4()),
-                    title = f"{len(words)-25} more results match your query ({len(words)} in total)",
-                    description = "Try refining your query.",
-                    input_message_content = InputTextMessageContent(f"{len(words)} results found matching query {query}")
+                    input_message_content=word
                 )
             )
     await update.inline_query.answer(results, cache_time=1)
